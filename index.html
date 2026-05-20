@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>520专属爱心</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: radial-gradient(circle at center, #E6CBBF 0%, #CF9E87 100%);
+            font-family: 'STKaiti', 'KaiTi', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        #ui-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.3);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            backdrop-filter: blur(8px);
+            transition: opacity 0.5s ease;
+        }
+        #textInput {
+            width: 350px;
+            padding: 12px;
+            font-size: 16px;
+            font-family: inherit;
+            border: none;
+            border-radius: 8px;
+            outline: none;
+            color: #555;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+            background: rgba(255, 255, 255, 0.8);
+        }
+        #startBtn {
+            display: block;
+            width: 100%;
+            margin-top: 20px;
+            padding: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            font-family: inherit;
+            color: #8c5b45;
+            background: #f4d3a2;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            transition: all 0.3s;
+        }
+        #startBtn:hover {
+            background: #e3be85;
+            color: #664130;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-container">
+        <input type="text" id="textInput" placeholder="520快乐耶! 钱纯熙爱自己的第19年! ">
+        <button id="startBtn">开启爱心</button>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+
+        const uiContainer = document.getElementById('ui-container');
+        const textInput = document.getElementById('textInput');
+        const startBtn = document.getElementById('startBtn');
+
+        let particles = [];
+        let textParticles = [];
+        let isAnimating = false;
+        let animationTime = 0;
+        let phase = 0; 
+        let customText = "";
+
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        });
+
+        function getHeartPoint(t, scale) {
+            const x = 16 * Math.pow(Math.sin(t), 3);
+            const y = -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t));
+            return { x: x * scale, y: y * scale };
+        }
+
+        function scatter(max) {
+            return (Math.random() - 0.5) * max;
+        }
+
+        class HeartParticle {
+            constructor(targetX, targetY, isHalo = false) {
+                const angle = Math.random() * Math.PI * 2;
+                const radius = Math.max(width, height);
+                this.x = width / 2 + Math.cos(angle) * radius;
+                this.y = height / 2 + Math.sin(angle) * radius;
+                
+                this.baseTargetX = targetX;
+                this.baseTargetY = targetY;
+                
+                this.size = Math.random() * 1.5 + 0.5;
+                const colors = ['#fde047', '#facc15', '#eab308', '#ca8a04', '#ffffff'];
+                this.color = colors[Math.floor(Math.random() * colors.length)];
+                
+                this.offsetX = scatter(isHalo ? 30 : 5);
+                this.offsetY = scatter(isHalo ? 30 : 5);
+                
+                this.speed = Math.random() * 0.02 + 0.02;
+                this.isHalo = isHalo;
+            }
+
+            update(scaleMod) {
+                let tx = width / 2 + (this.baseTargetX + this.offsetX) * scaleMod;
+                let ty = height / 2 + (this.baseTargetY + this.offsetY) * scaleMod;
+
+                if (this.isHalo) {
+                    tx += scatter(5);
+                    ty += scatter(5);
+                }
+
+                this.x += (tx - this.x) * this.speed;
+                this.y += (ty - this.y) * this.speed;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        class TextParticle {
+            constructor(targetX, targetY) {
+                // 赋予文字粒子初始在屏幕外围的随机位置，用于实现汇聚效果
+                const angle = Math.random() * Math.PI * 2;
+                const radius = Math.max(width, height);
+                this.x = width / 2 + Math.cos(angle) * radius;
+                this.y = height / 2 + Math.sin(angle) * radius;
+                
+                // 最终要汇聚到的文字坐标
+                this.targetX = targetX;
+                this.targetY = targetY;
+
+                this.size = Math.random() * 1.0 + 0.5;
+                this.baseAlpha = Math.random() * 0.5 + 0.3;
+                this.flashSpeed = Math.random() * 0.05 + 0.02;
+                this.time = Math.random() * 100;
+                this.active = false; 
+                this.speed = Math.random() * 0.03 + 0.01; // 汇聚速度
+            }
+
+            update(scaleMod) {
+                if (!this.active) return;
+                this.time += this.flashSpeed;
+                
+                // 让文字也跟随心跳进行极微小的缩放（可选，如果不想要可以删掉 scaleMod 的乘法）
+                let tx = width / 2 + (this.targetX - width / 2) * scaleMod;
+                let ty = height / 2 + (this.targetY - height / 2) * scaleMod;
+
+                // 粒子向目标位置平滑移动（汇聚）
+                this.x += (tx - this.x) * this.speed;
+                this.y += (ty - this.y) * this.speed;
+            }
+
+            draw() {
+                if (!this.active) return;
+                const alpha = this.baseAlpha + Math.sin(this.time) * 0.5;
+                ctx.fillStyle = `rgba(255, 255, 255, ${Math.max(0, alpha)})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function generateHeart() {
+            particles = [];
+            const count = 4500; 
+            const baseScale = Math.min(width, height) / 45; 
+
+            for (let i = 0; i < count; i++) {
+                const t = Math.random() * Math.PI * 2;
+                const r = Math.sqrt(Math.random()); 
+                const scale = baseScale * r;
+                
+                const pt = getHeartPoint(t, scale);
+                
+                if (r > 0.9 && i % 4 === 0) {
+                    particles.push(new HeartParticle(pt.x, pt.y, true));
+                } else {
+                    particles.push(new HeartParticle(pt.x, pt.y, false));
+                }
+            }
+        }
+
+        function generateText() {
+            textParticles = [];
+            const tempCanvas = document.createElement('canvas');
+            const tCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = width;
+            tempCanvas.height = height;
+
+            tCtx.fillStyle = "white";
+            tCtx.textBaseline = "middle";
+            tCtx.textAlign = "center";
+            
+            let fontSize = Math.min(width / 9, 60); 
+            tCtx.font = `bold ${fontSize}px 'STKaiti', 'KaiTi', 'PingFang SC'`;
+            
+            // 过滤空行并计算排版所需总高度
+            const lines = customText.split(' ').filter(line => line.trim() !== ""); 
+            const lineHeight = fontSize * 1.5;
+            const totalHeight = lines.length * lineHeight;
+            
+            // 让文字块整体垂直居中于屏幕正中心
+            const startY = height / 2 - totalHeight / 2 + lineHeight / 2; 
+
+            lines.forEach((line, index) => {
+                 tCtx.fillText(line, width / 2, startY + index * lineHeight);
+            });
+
+            const imgData = tCtx.getImageData(0, 0, width, height).data;
+            
+            // 使用步长为2扫描，但增加25%的随机剔除，达到完美的中等密度
+            for (let y = 0; y < height; y += 2) {
+                for (let x = 0; x < width; x += 2) {
+                    const index = (y * width + x) * 4;
+                    const alpha = imgData[index + 3];
+                    if (alpha > 128) { 
+                        // 75% 的概率生成粒子，既致密又不会像一堵实心墙
+                        if (Math.random() > 0.25) {
+                            textParticles.push(new TextParticle(x, y));
+                        }
+                    }
+                }
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            ctx.fillStyle = 'rgba(207, 158, 135, 0.25)'; 
+            ctx.fillRect(0, 0, width, height);
+
+            animationTime += 0.05;
+
+            let heartScale = 1;
+            // 设定心跳阶段
+            if (phase >= 1) {
+                const beat = animationTime % Math.PI;
+                heartScale = 1 + Math.pow(Math.sin(beat), 6) * 0.15;
+            }
+
+            particles.forEach(p => {
+                p.update(heartScale);
+                p.draw();
+            });
+
+            if (phase === 2) {
+                // 文字也随着心跳轻微跳动，使得整体更和谐 (可选 scale 取 1 + (heartScale-1)*0.3)
+                const textScale = 1 + (heartScale - 1) * 0.2; 
+                textParticles.forEach(p => {
+                    p.active = true;
+                    p.update(textScale);
+                    p.draw();
+                });
+            }
+        }
+
+        startBtn.addEventListener('click', () => {
+            const val = textInput.value.trim();
+            customText = val || textInput.placeholder; 
+            
+            uiContainer.style.opacity = '0'; 
+            setTimeout(() => {
+                uiContainer.style.display = 'none';
+            }, 500);
+
+            generateHeart();
+            generateText();
+            
+            if (!isAnimating) {
+                isAnimating = true;
+                animate();
+                
+                setTimeout(() => { phase = 1; }, 2000); // 2秒后爱心开始跳动
+                setTimeout(() => { phase = 2; }, 4000); // 4秒后文字粒子开始从外围汇聚
+            }
+        });
+    </script>
+</body>
+</html>

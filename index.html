@@ -150,40 +150,37 @@
 
         class TextParticle {
             constructor(targetX, targetY) {
-                // 赋予文字粒子初始在屏幕外围的随机位置，用于实现汇聚效果
                 const angle = Math.random() * Math.PI * 2;
                 const radius = Math.max(width, height);
                 this.x = width / 2 + Math.cos(angle) * radius;
                 this.y = height / 2 + Math.sin(angle) * radius;
                 
-                // 最终要汇聚到的文字坐标
                 this.targetX = targetX;
                 this.targetY = targetY;
 
-                this.size = Math.random() * 1.0 + 0.5;
-                this.baseAlpha = Math.random() * 0.5 + 0.3;
+                // 稍微增大了粒子，并提高了基础透明度，让字显得更实
+                this.size = Math.random() * 1.2 + 0.8;
+                this.baseAlpha = Math.random() * 0.4 + 0.6;
                 this.flashSpeed = Math.random() * 0.05 + 0.02;
                 this.time = Math.random() * 100;
                 this.active = false; 
-                this.speed = Math.random() * 0.03 + 0.01; // 汇聚速度
+                this.speed = Math.random() * 0.03 + 0.015; 
             }
 
             update(scaleMod) {
                 if (!this.active) return;
                 this.time += this.flashSpeed;
                 
-                // 让文字也跟随心跳进行极微小的缩放（可选，如果不想要可以删掉 scaleMod 的乘法）
                 let tx = width / 2 + (this.targetX - width / 2) * scaleMod;
                 let ty = height / 2 + (this.targetY - height / 2) * scaleMod;
 
-                // 粒子向目标位置平滑移动（汇聚）
                 this.x += (tx - this.x) * this.speed;
                 this.y += (ty - this.y) * this.speed;
             }
 
             draw() {
                 if (!this.active) return;
-                const alpha = this.baseAlpha + Math.sin(this.time) * 0.5;
+                const alpha = this.baseAlpha + Math.sin(this.time) * 0.4;
                 ctx.fillStyle = `rgba(255, 255, 255, ${Math.max(0, alpha)})`;
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
@@ -225,12 +222,10 @@
             let fontSize = Math.min(width / 9, 60); 
             tCtx.font = `bold ${fontSize}px 'STKaiti', 'KaiTi', 'PingFang SC'`;
             
-            // 过滤空行并计算排版所需总高度
             const lines = customText.split(' ').filter(line => line.trim() !== ""); 
             const lineHeight = fontSize * 1.5;
             const totalHeight = lines.length * lineHeight;
             
-            // 让文字块整体垂直居中于屏幕正中心
             const startY = height / 2 - totalHeight / 2 + lineHeight / 2; 
 
             lines.forEach((line, index) => {
@@ -239,14 +234,13 @@
 
             const imgData = tCtx.getImageData(0, 0, width, height).data;
             
-            // 使用步长为2扫描，但增加25%的随机剔除，达到完美的中等密度
+            // 保持紧凑的步长2，并且保留95%以上的粒子，大幅提升清晰度
             for (let y = 0; y < height; y += 2) {
                 for (let x = 0; x < width; x += 2) {
                     const index = (y * width + x) * 4;
                     const alpha = imgData[index + 3];
                     if (alpha > 128) { 
-                        // 75% 的概率生成粒子，既致密又不会像一堵实心墙
-                        if (Math.random() > 0.25) {
+                        if (Math.random() > 0.05) { // 之前是 0.25，现在几乎不剔除
                             textParticles.push(new TextParticle(x, y));
                         }
                     }
@@ -262,7 +256,6 @@
             animationTime += 0.05;
 
             let heartScale = 1;
-            // 设定心跳阶段
             if (phase >= 1) {
                 const beat = animationTime % Math.PI;
                 heartScale = 1 + Math.pow(Math.sin(beat), 6) * 0.15;
@@ -274,7 +267,6 @@
             });
 
             if (phase === 2) {
-                // 文字也随着心跳轻微跳动，使得整体更和谐 (可选 scale 取 1 + (heartScale-1)*0.3)
                 const textScale = 1 + (heartScale - 1) * 0.2; 
                 textParticles.forEach(p => {
                     p.active = true;
@@ -300,8 +292,8 @@
                 isAnimating = true;
                 animate();
                 
-                setTimeout(() => { phase = 1; }, 2000); // 2秒后爱心开始跳动
-                setTimeout(() => { phase = 2; }, 4000); // 4秒后文字粒子开始从外围汇聚
+                setTimeout(() => { phase = 1; }, 2000); 
+                setTimeout(() => { phase = 2; }, 4000); 
             }
         });
     </script>
